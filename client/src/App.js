@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from './services/api';
 import {
   Bell, Share2, ShieldAlert, TrendingUp, Wallet, Calendar,
   PieChart, Sliders, Settings, Moon, Sun, Download, Plus,
@@ -210,8 +211,85 @@ export default function App() {
   const [ledgerType, setLedgerType] = useState('전체'); // '전체' | '매수' | '매도' | '이자/배당'
   const [ledgerSearch, setLedgerSearch] = useState('');
 
-  // 새 자산 추가 핸들러
-  const handleAddAsset = (e) => {
+  // 백엔드 API(Spring Boot / PostgreSQL) 초기 데이터 로딩
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [assetRes, ledgerRes, calendarRes, rebalRes, goalRes] = await Promise.all([
+          api.getAssets().catch(() => null),
+          api.getLedger().catch(() => null),
+          api.getCalendar().catch(() => null),
+          api.getRebalancing().catch(() => null),
+          api.getGoal().catch(() => null),
+        ]);
+
+        if (assetRes && Array.isArray(assetRes) && assetRes.length > 0) {
+          setAssets(assetRes.map((a) => ({
+            id: a.id,
+            category: a.category,
+            name: a.name,
+            buyPrice: a.purchaseAmount,
+            evalPrice: a.currentValue,
+            marketPrice: a.marketPrice,
+            taxRate: Number(a.taxRate),
+            targetDate: a.targetDate,
+            dDay: a.dDay ?? undefined,
+          })));
+        }
+
+        if (ledgerRes && Array.isArray(ledgerRes) && ledgerRes.length > 0) {
+          setLedgerTransactions(ledgerRes.map((l) => ({
+            id: l.id,
+            date: l.transactionDate,
+            category: l.category,
+            type: l.typeDisplay,
+            name: l.name,
+            amount: l.amount,
+            unitPrice: l.unitPrice,
+            quantity: l.quantity,
+            tax: l.tax,
+            settledAmount: l.settledAmount,
+            memo: l.memo,
+            status: l.status,
+            assetId: l.assetId,
+          })));
+        }
+
+        if (calendarRes && Array.isArray(calendarRes) && calendarRes.length > 0) {
+          setCalendarEvents(calendarRes.map((c) => ({
+            id: c.id,
+            date: c.eventDate,
+            name: c.title,
+            category: c.category,
+            flowType: c.flowType,
+            amount: c.amount,
+            memo: c.memo,
+          })));
+        }
+
+        if (rebalRes && Array.isArray(rebalRes) && rebalRes.length > 0) {
+          const ratioMap = {};
+          rebalRes.forEach((r) => {
+            ratioMap[r.category] = Number(r.targetRatio);
+          });
+          setTargetRatios((prev) => ({ ...prev, ...ratioMap }));
+        }
+
+        if (goalRes && goalRes.targetAmount) {
+          setTargetAmount(goalRes.targetAmount);
+          if (goalRes.monthlyContribution) setMonthlySave(goalRes.monthlyContribution);
+          if (goalRes.durationYears) setYears(goalRes.durationYears);
+        }
+      } catch (err) {
+        console.warn('백엔드 API 연동 실패 (더미 데이터 유지):', err);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // 새 자산 추가 핸들러 (백엔드 DB 영구 저장 연동)
+  const handleAddAsset = async (e) => {
     e.preventDefault();
     if (!newAssetName.trim()) {
       alert('자산명을 입력해 주세요.');
@@ -240,39 +318,90 @@ export default function App() {
     }
 
     const taxRate = newAssetCategory === '주식' ? 0.22 : newAssetCategory === '예금' ? 0.154 : 0.30;
+    const assetType = newAssetCategory === '주식' ? 'STOCK' : newAssetCategory === '예금' ? 'DEPOSIT' : 'REAL_ESTATE';
 
-    const newAsset = {
-      id: Date.now(),
-      category: newAssetCategory,
-      name: newAssetName.trim(),
-      buyPrice: buy,
-      evalPrice: evalPrice,
-      marketPrice: evalPrice,
-      taxRate: taxRate,
-      targetDate: newAssetDate,
-      dDay: newAssetCategory === '예금' ? calculatedDDay : undefined,
-    };
+    try {
+      // 1. 백엔드 DB에 자산 영구 저장 (POST /api/assets)
+      const savedAsset = await api.createAsset({
+        assetType,
+        category: newAssetCategory,
+        name: newAssetName.trim(),
+        purchaseAmount: buy,
+        currentValue: evalPrice,
+        marketPrice: evalPrice,
+        taxRate,
+        targetDate: newAssetDate,
+        dDay: newAssetCategory === '예금' ? calculatedDDay : null,
+      });
 
-    // 1. 자산 목록에 추가
-    setAssets((prev) => [newAsset, ...prev]);
+      const newAsset = {
+        id: savedAsset.id,
+        category: savedAsset.category,
+        name: savedAsset.name,
+        buyPrice: savedAsset.purchaseAmount,
+        evalPrice: savedAsset.currentValue,
+        marketPrice: savedAsset.marketPrice,
+        taxRate: Number(savedAsset.taxRate),
+        targetDate: savedAsset.targetDate,
+        dDay: savedAsset.dDay ?? undefined,
+      };
 
-    // 2. 상세 원장 거래 내역에 '매수' 항목 자동 추가
-    const newTxId = `TX-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-4)}`;
-    const newTx = {
-      id: newTxId,
-      date: newAssetDate || new Date().toISOString().split('T')[0],
-      category: newAssetCategory,
-      type: '매수',
-      name: newAssetName.trim(),
-      amount: buy,
-      unitPrice: null,
-      quantity: newAssetCategory === '예금' ? '정기 예치' : '신규 편입',
-      tax: 0,
-      settledAmount: buy,
-      memo: `${newAssetCategory} 신규 자산 포트폴리오 편입 (매수)`,
-      status: '완료',
-    };
-    setLedgerTransactions((prev) => [newTx, ...prev]);
+      setAssets((prev) => [newAsset, ...prev]);
+
+      // 2. 상세 원장 거래 내역에 '매수' 항목 자동 추가 및 DB 저장 (POST /api/ledger)
+      const newTxId = `TX-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-4)}`;
+      const newTxPayload = {
+        id: newTxId,
+        assetId: savedAsset.id,
+        category: newAssetCategory,
+        transactionType: 'BUY',
+        typeDisplay: '매수',
+        name: newAssetName.trim(),
+        amount: buy,
+        unitPrice: null,
+        quantity: newAssetCategory === '예금' ? '정기 예치' : '신규 편입',
+        tax: 0,
+        settledAmount: buy,
+        memo: `${newAssetCategory} 신규 자산 포트폴리오 편입 (매수)`,
+        status: '완료',
+        transactionDate: newAssetDate || new Date().toISOString().split('T')[0],
+      };
+
+      await api.createLedger(newTxPayload).catch((err) => console.warn('원장 기록 실패:', err));
+
+      const newTx = {
+        id: newTxId,
+        date: newTxPayload.transactionDate,
+        category: newAssetCategory,
+        type: '매수',
+        name: newAssetName.trim(),
+        amount: buy,
+        unitPrice: null,
+        quantity: newTxPayload.quantity,
+        tax: 0,
+        settledAmount: buy,
+        memo: newTxPayload.memo,
+        status: '완료',
+        assetId: savedAsset.id,
+      };
+      setLedgerTransactions((prev) => [newTx, ...prev]);
+    } catch (err) {
+      console.error('자산 추가 중 오류 발생:', err);
+      alert('자산 추가 중 서버 통신 오류가 발생했습니다. 로컬 상태에만 임시 추가됩니다.');
+
+      const fallbackAsset = {
+        id: Date.now(),
+        category: newAssetCategory,
+        name: newAssetName.trim(),
+        buyPrice: buy,
+        evalPrice: evalPrice,
+        marketPrice: evalPrice,
+        taxRate: taxRate,
+        targetDate: newAssetDate,
+        dDay: newAssetCategory === '예금' ? calculatedDDay : undefined,
+      };
+      setAssets((prev) => [fallbackAsset, ...prev]);
+    }
 
     // 폼 초기화 및 모달 닫기
     setNewAssetName('');
@@ -379,8 +508,8 @@ export default function App() {
   // 전체 통합 캘린더 이벤트 (사용자 직접 등록 일정 + 자산 연동 일정)
   const allCalendarEvents = [...calendarEvents, ...assetCalendarEvents];
 
-  // 새 금융 일정 추가 핸들러
-  const handleAddCalendarEvent = (e) => {
+  // 새 금융 일정 추가 핸들러 (백엔드 DB 영구 저장 연동)
+  const handleAddCalendarEvent = async (e) => {
     e.preventDefault();
     if (!newEventName.trim()) {
       alert('일정명을 입력해 주세요.');
@@ -392,8 +521,27 @@ export default function App() {
       return;
     }
 
+    const eventId = `CE-${Date.now()}`;
+    const eventType = newEventFlowType === 'income' ? 'INCOME' : newEventFlowType === 'expense' ? 'EXPENSE' : 'MATURITY';
+
+    try {
+      await api.createCalendar({
+        id: eventId,
+        title: newEventName.trim(),
+        category: newEventCategory,
+        flowType: newEventFlowType,
+        eventType: eventType,
+        amount: amt,
+        eventDate: newEventDate,
+        memo: newEventMemo.trim() || `${newEventCategory} 금융 일정`,
+        isCompleted: false,
+      });
+    } catch (err) {
+      console.warn('캘린더 일정 DB 저장 실패 (로컬 상태만 반영):', err);
+    }
+
     const newEvt = {
-      id: `CE-${Date.now()}`,
+      id: eventId,
       date: newEventDate,
       name: newEventName.trim(),
       category: newEventCategory,
