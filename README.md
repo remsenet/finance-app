@@ -57,9 +57,9 @@ finance-app/
   - 대시보드, 상세 원장, 캘린더, 리밸런싱, 시뮬레이터, 자산 추가 모달 구현 및 로컬 테스트 완료
 - [x] **2단계: 소스 코드 버전 관리**
   - Git 초기화, 커밋 작성자(`remsenet`) 설정 및 GitHub(`remsenet/finance-app`) 원격 저장소 연동
-- [ ] **3단계: 데이터베이스 설계 및 스키마 구축**
-  - `assets`, `ledger_transactions`, `notifications`, `goals` 테이블 설계 및 PostgreSQL 스키마 구축
-- [ ] **4단계: 백엔드 API 서버 구축**
-  - `server/` 폴더에 Spring Boot(내장 Tomcat) 기반 REST API 개발 및 React 프론트엔드 연동
-- [ ] **5단계: 컨테이너화 및 클라우드 배포**
-  - React(Nginx) + Spring Boot(Tomcat) + PostgreSQL `docker-compose.yml` 컨테이너 배포
+- [x] **3단계: 데이터베이스 설계 및 스키마 구축**
+  - `assets`, `ledger_transactions`, `calendar_events`, `rebalancing_targets`, `goals` 테이블 설계 및 PostgreSQL 스키마 구축 완료
+- [x] **4단계: 백엔드 API 서버 구축**
+  - `server/` 폴더에 Spring Boot(내장 Tomcat 8080) 기반 REST API 개발 및 React 프론트엔드 풀스택 연동 완료
+- [x] **5단계: 컨테이너화 및 3-티어 통합 배포 환경 구축**
+  - React(Nginx 3000) + Spring Boot(Tomcat 8080) + PostgreSQL(5432) `docker-compose.yml` 컨테이너 배포 환경 완성 (`docker compose up -d` 원클릭 구동)
