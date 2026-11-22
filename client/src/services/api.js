@@ -70,6 +70,11 @@ export const api = {
     if (!res.ok) throw new Error('캘린더 일정을 등록하지 못했습니다.');
     return res.json();
   },
+  deleteCalendar: async (id) => {
+    const res = await fetch(`${API_BASE_URL}/calendar/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('캘린더 일정을 삭제하지 못했습니다.');
+    return true;
+  },
 
   // 리밸런싱 (Rebalancing)
   getRebalancing: async () => {
@@ -77,11 +82,29 @@ export const api = {
     if (!res.ok) throw new Error('리밸런싱 목표 비중을 불러오지 못했습니다.');
     return res.json();
   },
+  updateRebalancing: async (targets) => {
+    const res = await fetch(`${API_BASE_URL}/rebalancing`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(targets),
+    });
+    if (!res.ok) throw new Error('리밸런싱 목표 비중을 저장하지 못했습니다.');
+    return res.json();
+  },
 
   // 목표 시뮬레이터 (Goals)
   getGoal: async () => {
     const res = await fetch(`${API_BASE_URL}/goals`);
     if (!res.ok) throw new Error('목표 시뮬레이터 설정을 불러오지 못했습니다.');
+    return res.json();
+  },
+  updateGoal: async (data) => {
+    const res = await fetch(`${API_BASE_URL}/goals`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('목표 시뮬레이터 설정을 저장하지 못했습니다.');
     return res.json();
   },
 };

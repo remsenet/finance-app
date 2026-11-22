@@ -5,7 +5,8 @@ import {
   PieChart, Sliders, Settings, Moon, Sun, Download, Plus,
   X, Building2, CheckCircle2, ArrowUpRight, ArrowDownRight,
   Info, Filter, Search, RefreshCw, ChevronLeft, ChevronRight, Clock,
-  Scale, AlertTriangle, ArrowRightLeft, Sparkles, Target, Zap, Flame, Award
+  Scale, AlertTriangle, ArrowRightLeft, Sparkles, Target, Zap, Flame, Award,
+  Trash2, Save
 } from 'lucide-react';
 import {
   BarChart, Bar, AreaChart, Area, ReferenceLine, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -409,6 +410,81 @@ export default function App() {
     setNewAssetEvalPrice('');
     setNewAssetDate(new Date().toISOString().split('T')[0]);
     setShowAddModal(false);
+  };
+
+  // 1. 자산 삭제 핸들러 (DELETE /api/assets/{id})
+  const handleDeleteAsset = async (assetId) => {
+    if (!window.confirm('정말 이 자산을 삭제하시겠습니까? (DB에서 영구 삭제됩니다)')) return;
+    try {
+      await api.deleteAsset(assetId);
+      setAssets((prev) => prev.filter((a) => a.id !== assetId));
+      if (selectedAssetPopup && selectedAssetPopup.id === assetId) {
+        setSelectedAssetPopup(null);
+      }
+    } catch (err) {
+      console.error('자산 삭제 실패:', err);
+      alert('자산 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 2. 상세 원장 거래 내역 삭제 핸들러 (DELETE /api/ledger/{id})
+  const handleDeleteLedger = async (txId) => {
+    if (!window.confirm('이 거래 내역을 원장에서 삭제하시겠습니까? (DB에서 영구 삭제됩니다)')) return;
+    try {
+      await api.deleteLedger(txId);
+      setLedgerTransactions((prev) => prev.filter((t) => t.id !== txId));
+    } catch (err) {
+      console.error('원장 삭제 실패:', err);
+      alert('거래 내역 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 3. 캘린더 일정 삭제 핸들러 (DELETE /api/calendar/{id})
+  const handleDeleteCalendarEvent = async (evtId) => {
+    if (!window.confirm('이 금융 일정을 삭제하시겠습니까? (DB에서 영구 삭제됩니다)')) return;
+    try {
+      await api.deleteCalendar(evtId);
+      setCalendarEvents((prev) => prev.filter((e) => e.id !== evtId));
+    } catch (err) {
+      console.error('일정 삭제 실패:', err);
+      alert('일정 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 4. 리밸런싱 목표 비중 DB 영구 저장 (PUT /api/rebalancing)
+  const handleSaveRebalancing = async () => {
+    try {
+      const payload = [
+        { assetType: 'STOCK', category: '주식', targetRatio: targetRatios.주식 },
+        { assetType: 'DEPOSIT', category: '예금', targetRatio: targetRatios.예금 },
+        { assetType: 'REAL_ESTATE', category: '부동산', targetRatio: targetRatios.부동산 },
+      ];
+      await api.updateRebalancing(payload);
+      alert('리밸런싱 목표 비중이 PostgreSQL 데이터베이스에 성공적으로 저장되었습니다!');
+    } catch (err) {
+      console.error('리밸런싱 저장 실패:', err);
+      alert('리밸런싱 비중 저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 5. 목표 시뮬레이터 설정 DB 영구 저장 (PUT /api/goals)
+  const handleSaveGoal = async () => {
+    try {
+      const payload = {
+        id: 1,
+        goalName: '내 집 마련 (수도권 아파트)',
+        targetAmount: Number(simTargetAmount || targetAmount),
+        currentSeed: Number(effectiveInitialAmount || 100000000),
+        monthlyContribution: Number(simMonthlySave || monthlySave),
+        expectedReturnRate: Number(simAnnualRate || 6.0),
+        durationYears: Number(simYears || years),
+      };
+      await api.updateGoal(payload);
+      alert('시뮬레이션 목표 설정이 PostgreSQL 데이터베이스에 성공적으로 저장되었습니다!');
+    } catch (err) {
+      console.error('목표 시뮬레이터 저장 실패:', err);
+      alert('목표 설정 저장 중 오류가 발생했습니다.');
+    }
   };
 
   // 세금 반영 여부에 따른 자산 계산[cite: 1]
@@ -1256,12 +1332,13 @@ export default function App() {
                                           <th className="py-3 px-4 text-right">실 정산금액</th>
                                           <th className="py-3 px-4">적요 및 비고</th>
                                           <th className="py-3 px-3 text-center">상태</th>
+                                          <th className="py-3 px-2 text-center">관리</th>
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
                                         {filteredTransactions.length === 0 ? (
                                           <tr>
-                                            <td colSpan="10" className="py-12 text-center text-slate-400">
+                                            <td colSpan="11" className="py-12 text-center text-slate-400">
                                               <Info className="w-8 h-8 mx-auto mb-2 opacity-40" />
                                               <p className="font-semibold text-sm">해당 조건에 맞는 거래 내역이 없습니다.</p>
                                               <p className="text-xs mt-1">자산 구분 필터 또는 검색어를 변경해 보세요.</p>
@@ -1366,6 +1443,17 @@ export default function App() {
                                                   <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-medium">
                                                     <CheckCircle2 className="w-3 h-3" /> {tx.status}
                                                   </span>
+                                                </td>
+
+                                                {/* 관리/삭제 */}
+                                                <td className="py-3 px-2 text-center">
+                                                  <button
+                                                    onClick={() => handleDeleteLedger(tx.id)}
+                                                    title="거래 내역 삭제 (DB 영구 삭제)"
+                                                    className="p-1 text-slate-400 hover:text-rose-500 rounded transition"
+                                                  >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                  </button>
                                                 </td>
                                               </tr>
                                             );
@@ -1688,9 +1776,19 @@ export default function App() {
                                                       {evt.memo}
                                                     </p>
                                                   )}
-                                                  {evt.isAsset && (
+                                                  {evt.isAsset ? (
                                                     <div className="mt-1 text-[10px] text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
                                                       <CheckCircle2 className="w-3 h-3" /> 보유 자산 실시간 연동됨
+                                                    </div>
+                                                  ) : (
+                                                    <div className="mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-600/50 flex justify-end">
+                                                      <button
+                                                        onClick={() => handleDeleteCalendarEvent(evt.id)}
+                                                        title="일정 삭제 (DB 영구 삭제)"
+                                                        className="text-[11px] text-slate-400 hover:text-rose-500 flex items-center gap-1 transition"
+                                                      >
+                                                        <Trash2 className="w-3 h-3" /> 일정 삭제
+                                                      </button>
                                                     </div>
                                                   )}
                                                 </div>
@@ -1732,6 +1830,12 @@ export default function App() {
                                       <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
                                         진단 기준: 편차 ±5%p
                                       </span>
+                                      <button
+                                        onClick={handleSaveRebalancing}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition"
+                                      >
+                                        <Save className="w-3.5 h-3.5" /> 목표 비중 DB 저장
+                                      </button>
                                     </div>
                                   </div>
 
@@ -2039,6 +2143,12 @@ export default function App() {
                                       <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center gap-1">
                                         <Flame className="w-3.5 h-3.5 text-amber-500" /> 월 복리(Monthly Compound) 적용 중
                                       </span>
+                                      <button
+                                        onClick={handleSaveGoal}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition"
+                                      >
+                                        <Save className="w-3.5 h-3.5" /> 시뮬레이션 목표 DB 저장
+                                      </button>
                                     </div>
                                   </div>
 
@@ -2438,12 +2548,20 @@ export default function App() {
                               </div>
                             )}
                           </div>
-                          <button
-                            onClick={() => setSelectedAssetPopup(null)}
-                            className="mt-6 w-full py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm"
-                          >
-                            확인
-                          </button>
+                          <div className="mt-6 flex gap-2">
+                            <button
+                              onClick={() => handleDeleteAsset(selectedAssetPopup.id)}
+                              className="w-1/3 py-2.5 rounded-xl border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-semibold text-sm flex items-center justify-center gap-1.5 transition"
+                            >
+                              <Trash2 className="w-4 h-4" /> 자산 삭제
+                            </button>
+                            <button
+                              onClick={() => setSelectedAssetPopup(null)}
+                              className="w-2/3 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
+                            >
+                              확인
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
