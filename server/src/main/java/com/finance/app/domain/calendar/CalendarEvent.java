@@ -1,5 +1,7 @@
 package com.finance.app.domain.calendar;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.finance.app.domain.asset.Asset;
 import jakarta.persistence.*;
 import lombok.*;
@@ -21,9 +23,15 @@ public class CalendarEvent {
     @Column(length = 50)
     private String id; // 예: 'CE-1'
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "asset_id")
     private Asset asset;
+
+    @JsonProperty("assetId")
+    public Long getAssetId() {
+        return asset != null ? asset.getId() : null;
+    }
 
     @Column(nullable = false, length = 150)
     private String title;

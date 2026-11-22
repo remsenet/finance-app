@@ -1,4 +1,22 @@
 services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: finance-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-finance_db}
+      POSTGRES_USER: ${POSTGRES_USER:-finance_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finance_pass}
+      TZ: Asia/Seoul
+    depends_on:
+      - postgres
+
   postgres:
     image: postgres:16-alpine
     container_name: finance-postgres

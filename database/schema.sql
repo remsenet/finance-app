@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS calendar_events (
     title VARCHAR(150) NOT NULL,
     category VARCHAR(20) NOT NULL, -- '부동산', '예금', '주식', '지출', '저축'
     flow_type VARCHAR(20) NOT NULL CHECK (flow_type IN ('income', 'expense', 'neutral')),
-    event_type VARCHAR(20) NOT NULL CHECK (event_type IN ('MATURITY', 'DIVIDEND', 'EXPENSE', 'INCOME', 'SAVING')),
+    event_type VARCHAR(20) NOT NULL CHECK (event_type IN ('MATURITY', 'DIVIDEND', 'EXPENSE', 'INCOME', 'SAVING', 'INTEREST')),
     amount BIGINT DEFAULT 0,
     event_date DATE NOT NULL,
     memo TEXT,
@@ -121,3 +121,9 @@ INSERT INTO ledger_transactions (id, asset_id, category, transaction_type, type_
 ('TX-20260930-09', NULL, '예금', 'INTEREST', '이자', '하나 하나의정기예금', 400000, NULL, '만기 이자 정산', 61600, 338400, '정기예금 만기 이자 수취', '완료', '2026-09-30'),
 ('TX-20260915-10', NULL, '부동산', 'SELL', '매도', '마포 원룸 개발 펀드', 30000000, NULL, '지분 청산', 750000, 29250000, 'PF 사업장 준공 및 분양 완료에 따른 투자금 회수', '완료', '2026-09-15')
 ON CONFLICT (id) DO NOTHING;
+
+
+-- 시퀀스 동기화 (초기 수동 ID 부여 후 자동증가 시퀀스를 최대 ID로 갱신)
+SELECT setval(pg_get_serial_sequence('assets', 'id'), COALESCE(max(id), 1)) FROM assets;
+SELECT setval(pg_get_serial_sequence('rebalancing_targets', 'id'), COALESCE(max(id), 1)) FROM rebalancing_targets;
+SELECT setval(pg_get_serial_sequence('goals', 'id'), COALESCE(max(id), 1)) FROM goals;
