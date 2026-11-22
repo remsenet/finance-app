@@ -10,6 +10,10 @@ client/node_modules/
 /dist
 client/build/
 client/dist/
+server/build/
+server/.gradle/
+.gradle/
+*.class
 
 # Environment Variables (보안 중요)
 .env
