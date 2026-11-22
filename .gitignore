@@ -16,6 +16,7 @@ client/dist/
 .env.*
 *.env
 **/.env*
+!.env.example
 
 # Logs & OS Files
 npm-debug.log*
